@@ -1,0 +1,182 @@
+---
+title: "Logistic Regression and Random Forests for Classification"
+author: "Edward Moradian"
+date: "09 May 2018"
+output:
+  word_document: default
+---
+## Question 1: Logistic Regression Analysis of the Credit Data 
+
+## Step 1: Load the data 
+
+```{r}
+credit <- read.csv("http://www.sci.csueastbay.edu/~esuess/classes/Statistics_6620/Presentations/ml7/credit.csv")
+```
+
+## Step 2: Exploring and preparing the data
+
+Fix the default variable to be 0 or 1
+```{r}
+credit$default <- as.numeric(credit$default)
+credit$default <- credit$default - 1
+```
+
+Examine the Credit Data
+
+1000 observations of 17 variables.
+```{r}
+str(credit)
+```
+
+## Step 3: Training a model on the data 
+
+Set up trainning and test data sets.
+
+Using 90% of the data set for training data and 10% of the data set for testing.
+```{r}
+indx <- sample(1:nrow(credit), as.integer(0.9*nrow(credit)))
+
+credit_train <- credit[indx,]
+credit_test <- credit[-indx,]
+
+credit_train_labels <- credit[indx,17]
+credit_test_labels <- credit[-indx,17] 
+```
+
+Check if there are any missing values. Amelia shows that there are no missing values.
+```{r}
+library(Amelia)
+missmap(credit, main = "Missing values vs observed")
+```
+
+Number of missing values in each column.  There are no missing values in any columns.
+```{r}
+sapply(credit,function(x) sum(is.na(x)))
+```
+
+Fit the logistic regression model, with all predictor variables
+
+Many of the regression coefficients were not statistically significant.
+```{r}
+model <- glm(default ~.,family=binomial(link='logit'),data=credit_train)
+model
+
+summary(model)
+```
+
+```{r}
+anova(model, test="Chisq")
+```
+
+Drop the insignificant predictors, alpha = 0.10
+```{r}
+model <- glm(default ~ checking_balance + months_loan_duration + credit_history +  percent_of_income + age,family=binomial(link='logit'),data=credit_train)
+model
+
+summary(model)
+```
+
+```{r}
+anova(model, test="Chisq")
+```
+## Step 4: Evaluating model performance
+
+Check Accuracy. Accuracy is 77%, which is very good.
+```{r}
+fitted.results <- predict(model,newdata=credit_test,type='response')
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+
+misClasificError <- mean(fitted.results != credit_test$default)
+print(paste('Accuracy',1-misClasificError))
+```
+
+Plotting an AUC curve to check the performance of the logistic regression model. The plot shows good performance.
+```{r}
+library(ROCR)
+p <- predict(model, newdata=credit_test, type="response")
+pr <- prediction(p, credit_test$default)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc") #Area under the curve
+auc <- auc@y.values[[1]]
+auc
+```
+
+## Step 5: Improving model performance 
+
+The statistically insignificant regression coefficients were dropped from the final model.
+
+## Question 2: Random Forest Analysis of the Credit Data
+
+## Step 1: Load the data 
+
+```{r}
+library(randomForest)
+library(caret)
+set.seed(300)
+credit <- read.csv("http://www.sci.csueastbay.edu/~esuess/classes/Statistics_6620/Presentations/ml7/credit.csv")
+```
+
+## Step 2: Exploring and preparing the data
+
+Examine the Credit Data
+
+1000 observations of 17 variables.
+```{r}
+str(credit)
+```
+
+## Step 3: Training a model on the data 
+
+```{r}
+rf <- randomForest(default ~ ., data = credit)
+```
+
+## Step 4: Evaluating model performance
+
+There were 500 trees that were used with four variables used at each split.  The error rate is at 23.3%. This error rate is the out-of-bag error rate. This is an unbiased estimate of the test set error.
+
+```{r}
+rf
+credit_pred <- predict(rf, credit)
+confusionMatrix(data=credit_pred, credit$default)
+```
+
+## Step 5: Improving model performance 
+
+Using an auto-tuned random forest.
+
+mtry defines how many features are randomly selected at each split. We are setting mtry as 2, 4, 8 and 16.
+
+```{r}
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+grid_rf <- expand.grid(.mtry = c(2, 4, 8, 16))
+```
+
+Showing the resampling results across the tuning parameters. The random forest with mtry = 16 had the highest Kappa at .36. This is the best random forest model.
+```{r}
+set.seed(300)
+m_rf <- train(default ~ ., data = credit, method = "rf",metric = "Kappa", trControl = ctrl,tuneGrid = grid_rf)
+m_rf
+```
+
+```{r}
+credit_pred <- predict(m_rf, credit)
+confusionMatrix(data=credit_pred, credit$default)
+```
+
+Using the ranger package for a random forest. This is a fast implementation of random forests.
+
+```{r}
+library(ranger)
+set.seed(300)
+m_rf_ranger <- ranger(default ~ ., data = credit, num.threads = 8)
+```
+
+The ranger random forest model returned the same out-of-bag error rate as the randomFunction package. In turn, the confustion matrix is also very similar. 500 trees were used with an mtry of 4.
+```{r}
+m_rf_ranger
+m_rf_ranger$confusion.matrix
+```
+

@@ -1,0 +1,331 @@
+---
+title: "Simple Linear Regression, Multiple Linear Regression and Regression Trees for Prediction"
+author: "Edward Moradian"
+date: "02 May 2018"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+## Question 1: Linear Regression Analysis of the Insurance Data 
+
+## Step 1: Load the data 
+
+```{r}
+library(psych)
+insurance <- read.csv("insurance.csv",stringsAsFactors = TRUE)
+```
+
+## Step 2: Exploring and preparing the data
+
+Features include: age, sex, bmi, children, smoker and region.
+```{r}
+str(insurance)
+```
+
+Summarize the charges variable - Medical expenses are at a range from 1,122 to 63,770 dollars
+
+Histogram of insurance charges - Histogram shows a right skew for the amount in expenses
+
+Table of region - regions have similar frequencies compared to one another
+```{r}
+summary(insurance$expenses)
+hist(insurance$expenses)
+table(insurance$region)
+```
+
+Exploring relationships among features: correlation matrix
+
+Slight positive correlation between all four features.
+```{r}
+cor(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+Visualing relationships among features: scatterplot matrix
+```{r}
+pairs(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+More informative scatterplot matrix
+```{r}
+pairs.panels(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+## Step 3: Training a model on the data 
+
+Fit a linear regression model to estimate the total medical expenses by six independent variables.
+
+Y = -11,941.60 + 256.8X1 + 475.70X2 + 339.30X3 + -131.4X4 + 23,847.50X5 + -352.80X6 + -352.80X7 + -1,035.60X8 + -959.30X9
+```{r}
+ins_model <- lm(expenses ~ age + children + bmi + sex + smoker + region, data = insurance)
+ins_model
+```
+
+## Step 4: Evaluating model performance
+
+See more detail about the estimated beta coefficients
+The y-intercept, age, children, bmi, smokeryes, regionsoutheast and regionsouthwest were all statistically significant. Adjusted R-squared is equal to .7494.  Therefore, the model explains nearly 75% of the variation in the dependent variable.
+```{r}
+summary(ins_model)
+```
+## Step 5: Improving model performance 
+
+Add a higher-order "age" term and therefore we are treating the model as a polynomial.
+```{r}
+insurance$age2 <- insurance$age^2
+```
+
+
+Add a binary indicator for BMI >= 30 to test for obesity.
+```{r}
+insurance$bmi30 <- ifelse(insurance$bmi >= 30, 1, 0)
+```
+
+Create final model
+Testing also with an interaction between obesity and smoking.
+
+Adjusted R-squared value has improved from .75 to .87.  Age2, children, bmi, sexmale, bmi30, smokeryes, regionsoutheast, regionsouthwest and bmi:smokeryes were all statistically significant. There is increased costs of 13,404 for smoking alone, whereas the interaction between obesity and smoking has increased costs of 19,810 per year.
+```{r}
+ins_model2 <- lm(expenses ~ age + age2 + children + bmi + sex +bmi30*smoker + region, data = insurance)
+summary(ins_model2)
+```
+
+## Question 2: An Introduction to Statistical Learning - Example Code for Simple Linear Regression and Multiple Linear Regression
+
+#Simple Linear Regression
+```{r}
+library(MASS)
+library(ISLR)
+names(Boston)
+```
+
+Fit the data into a regression model. B0 and B1 are both highly statistically significant.
+```{r}
+lm.fit =lm(medv~lstat,data=Boston )
+lm.fit
+summary(lm.fit)
+```
+
+Get the regression coefficients again and also with a 95% confidence interval.
+```{r}
+names(lm.fit)
+coef(lm.fit)
+confint(lm.fit)
+```
+
+Getting the confidence interval and fitted value for lstat when lstat is equal to 5, 10 and 15.
+```{r}
+predict(lm.fit ,data.frame(lstat=c(5 ,10 ,15) ),interval ="confidence")
+predict(lm.fit ,data.frame(lstat=c(5 ,10 ,15) ),interval ="prediction")
+```
+
+Plot the regression line in a scatter plot. Different plots are used.
+```{r}
+plot(Boston$lstat,Boston$medv)
+abline(lm.fit)
+abline(lm.fit ,lwd =3)
+abline(lm.fit ,lwd =3, col ="red ")
+plot(Boston$lstat,Boston$medv ,col ="red ")
+plot(Boston$lstat,Boston$medv ,pch =20)
+plot(Boston$lstat,Boston$medv ,pch ="+")
+plot(1:20,1:20, pch =1:20)
+```
+
+Plotting 4 diagnostic plots. The residuals vs fitted plot shows that the residuals are centered around a horizontal band at 0 and therefore constant variances and linearity is upheld.  The QQ-plot shows that most of the points are on or near the line and therefore the normality of the data is upheld.
+```{r}
+par(mfrow =c(2,2))
+plot(lm.fit)
+```
+
+Another way to plot the residuals vs fitted plots.
+```{r}
+plot(predict (lm.fit), residuals (lm.fit))
+plot(predict (lm.fit), rstudent (lm.fit))
+```
+
+```{r}
+plot(hatvalues (lm.fit ))
+which.max (hatvalues (lm.fit))
+```
+
+#Multiple Linear Regression
+
+Fitting a regression model with multiple predictors.
+```{r}
+lm.fit =lm(medv~lstat+age ,data=Boston )
+summary (lm.fit)
+```
+
+Fit the regression model with all the predictor variables in the dataset.
+```{r}
+lm.fit =lm(medv~.,data=Boston )
+summary (lm.fit)
+```
+
+Using the vif function to calculate the variance inflation factors.
+```{r}
+library (car)
+vif(lm.fit)
+```
+
+Running the regression model with all of the predictor variables except for age.
+```{r}
+lm.fit1=lm(medv~.-age ,data=Boston )
+summary (lm.fit1)
+```
+
+Another way to run the regression model with all of the predictor variables except for age.
+```{r}
+lm.fit1=update (lm.fit , ~.-age)
+```
+
+## Question 3: regression Tree Based Analysis on the redwine data.
+
+# Step 1: Load the data 
+
+```{r}
+wine <- read.csv("redwines.csv")
+```
+
+# Step 2: Exploring and preparing the data
+
+Examine the wine data. There are 1,599 observations of 12 variables. There is a quality outcome variable that is rated from 0 (very bad) to 10 (excellent).
+```{r}
+str(wine)
+```
+
+The distribution of quality ratings appears to be normally distributed.
+```{r}
+hist(wine$quality)
+```
+
+Summary statistics of the wine data. Check for outliers.
+```{r}
+summary(wine)
+```
+75% of the data is being set as training data, whereas 25% of the data is being set as test data. The wine data set is already sorted into random order.
+```{r}
+wine_train <- wine[1:1200, ]
+wine_test <- wine[1200:1599, ]
+```
+
+# Step 3: Training a model on the data
+
+Regression tree using rpart. This is the classic R implementation of CART.
+
+Creating the regression tree model with quality as the outcome variable.
+```{r}
+library(rpart)
+m.rpart <- rpart(quality ~ ., data = wine_train)
+```
+
+Get basic information about the tree. Tree diagram will display these results.
+```{r}
+m.rpart
+```
+
+Get more detailed information about the tree
+```{r}
+summary(m.rpart)
+```
+
+Use the rpart.plot package to create a visualization
+```{r}
+library(rpart.plot)
+```
+
+A basic decision tree diagram
+6.6 is the highest rating. This corresponds to red wines with greater than or equal to 11.4$ alcohol with sulphates that are greater than or equal to .635. 4.38 is the lowest rating. This corresponds to red wines with a less than 11.4% alcohol with sulphates that are less than .585 and a colatile acidity that is greater than 1.01.
+
+```{r}
+rpart.plot(m.rpart, digits = 3)
+```
+
+A few adjustments to the diagram. A new and easier to read diagram.
+```{r}
+rpart.plot(m.rpart, digits = 4, fallen.leaves = TRUE, type = 3, extra = 101)
+```
+
+## Step 4: Evaluate model performance
+
+Generate predictions for the testing dataset
+Can use the same variable more than once in a regression tree
+```{r}
+p.rpart <- predict(m.rpart, wine_test)
+```
+
+Compare the distribution of predicted values vs. actual values
+```{r}
+summary(p.rpart)
+summary(wine_test$quality)
+```
+
+Compare the correlation between the predicted and actual quality values to guage the model's performance.  There is a modest strong positive correlation.
+```{r}
+cor(p.rpart, wine_test$quality)
+```
+
+Function to calculate the mean absolute error
+```{r}
+MAE <- function(actual, predicted) {
+  mean(abs(actual - predicted))  
+}
+```
+
+Mean absolute error between predicted and actual values. Measuring performance through MAE.
+
+The result of .54 implies that on average the different between our model's predictions and the true quality score was about .54. Keeping in mind that the quality scale was from 0 to 10, this is a very good result for our model and implies very good performance.
+```{r}
+MAE(p.rpart, wine_test$quality)
+```
+
+Mean absolute error between actual values and mean value. Calculating the mean quality rating in the training data.  The regression tree (MAE = .54) comes closer on average to the true quality score than the imputed mean (MAE = .70).
+```{r}
+mean(wine_train$quality) 
+MAE(5.64, wine_test$quality)
+```
+
+## Step 5: Improving model performance
+
+Train a M5 Model Tree. This is the current state-of-the-art in model trees.
+```{r}
+library(RWeka)
+m.m5p <- M5P(quality ~ ., data = wine_train)
+```
+
+Display the tree. Alcohol is the most important variable.  Then it is volatile acidity and then free sulfur dioxide.
+```{r}
+m.m5p
+```
+
+Get a summary of the model's performance
+```{r}
+summary(m.m5p)
+```
+
+Generate predictions for the model
+```{r}
+p.m5p <- predict(m.m5p, wine_test)
+```
+
+Summary statistics about the predictions
+```{r}
+summary(p.m5p)
+```
+
+Correlation between the predicted and true values
+
+The correlation in the model tree is .66 which is higher than the regression tree at .6.
+```{r}
+cor(p.m5p, wine_test$quality)
+```
+
+Mean absolute error of predicted and true values
+
+The MAE is also better in this model tree with a reduced MAE that is .49 from .54.
+```{r}
+MAE(wine_test$quality, p.m5p)
+```
+
+
+

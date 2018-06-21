@@ -1,0 +1,445 @@
+---
+title: "Using ANN for Prediction"
+author: "Edward Moradian"
+date: "14 May 2018"
+output:
+  word_document: default
+---
+## Question 1: Using ANN on the concrete data.
+
+## Step 1: Load the data 
+
+Read in data.
+```{r}
+concrete <- read.csv("concrete.csv")
+```
+
+## Step 2: Exploring and preparing the data
+
+Examine the structure of the data. The scales of the different variable are very different. We need to rescale the variables using a transformation.
+```{r}
+str(concrete)
+```
+
+Custom normalization function
+```{r}
+normalize <- function(x) 
+{ 
+  return((x - min(x)) / (max(x) - min(x)))
+}
+```
+
+Apply normalization to entire data frame
+```{r}
+concrete_norm <- as.data.frame(lapply(concrete, normalize))
+```
+
+The range is now between zero and one from looking at the minimum and maximum values.
+```{r}
+summary(concrete_norm$strength)
+```
+
+Compared to the original minimum and maximum which is not a range of 0 to 1.
+```{r}
+summary(concrete$strength)
+```
+
+Create training and test data. Approximately 3/4 of the data is set for training and 1/4 of the data is set for testing.
+```{r}
+concrete_train <- concrete_norm[1:773, ]
+concrete_test <- concrete_norm[774:1030, ]
+```
+
+## Step 3: Training a model on the data
+
+# simple ANN with only a single hidden neuron. Using a multilayer feedforward neural network. Strength is the target variable.
+```{r}
+library(neuralnet)
+set.seed(12345)
+concrete_model <- neuralnet(formula = strength ~ cement + slag + ash + water + superplastic + coarseagg + fineagg + age, data = concrete_train)
+```
+
+
+visualize the network topology. The nodes labeled as 1 are bias terms. The error is the sum of squares errors. The lower the SSE the better the predictive performance on the training data. In this case, the SSE is 5.08.
+```{r}
+plot(concrete_model)
+```
+
+Alternative plot
+```{r}
+library(NeuralNetTools)
+par(mar = numeric(4), family = 'serif')
+plotnet(concrete_model, alpha = 0.6)
+```
+
+## Step 4: Evaluating model performance
+
+Obtain model results. Using compute() to generate predictions on the test data set.
+```{r}
+model_results <- compute(concrete_model, concrete_test[1:8])
+```
+
+Obtain predicted strength values
+```{r}
+predicted_strength <- model_results$net.result
+```
+
+Examine the correlation between predicted and actual values. We are using numeric prediction and correlations between our predicted concrete strength and the true values. The r-value is .81 which indicates a very good model.
+```{r}
+cor(predicted_strength, concrete_test$strength)   
+```
+
+Produce actual predictions by 
+```{r}
+head(predicted_strength)
+concrete_train_original_strength <- concrete[1:773,"strength"]
+strength_min <- min(concrete_train_original_strength)
+strength_max <- max(concrete_train_original_strength)
+head(concrete_train_original_strength)
+```
+
+Custom normalization function to unnormalize to convert variables back to the original units of measurement.
+```{r}
+unnormalize <- function(x, min, max) 
+{ 
+  return( (max - min)*x + min )
+}
+```
+
+Unnormalize the data set.
+```{r}
+strength_pred <- unnormalize(predicted_strength, strength_min, strength_max)
+```
+
+## Step 5: Improving model performance 
+
+A more complex neural network topology with 5 hidden nodes in 1 layer. Using a sigmoid activation function.
+```{r}
+set.seed(12345)
+concrete_model2 <- neuralnet(strength ~ cement + slag +
+                               ash + water + superplastic + 
+                               coarseagg + fineagg + age,
+                               data = concrete_train, hidden = 5, act.fct = "logistic")
+```
+
+Plot the network. Shows many layers. The SSE has also been reduced to 1.63 from 5.08. This indicates a better model in terms of its prediction in the training data set. This is also better than a model with 2 layers with hidden = (5,2), 5 nodes for the first layer and 2 nodes for the second layer.
+```{r}
+plot(concrete_model2)
+```
+
+Using plotnet
+```{r}
+par(mar = numeric(4), family = 'serif')
+plotnet(concrete_model2, alpha = 0.6)
+```
+
+Evaluate the results as we did before. The correlation has increased from .81 to .92 which also indicates a better model.
+```{r}
+model_results2 <- compute(concrete_model2, concrete_test[1:8])
+predicted_strength2 <- model_results2$net.result
+cor(predicted_strength2, concrete_test$strength)  
+```
+
+Try different activation function with 5 hidden neurons by a hyperbolic tangent activation function.
+```{r}
+set.seed(12345) 
+concrete_model2 <- neuralnet(strength ~ cement + slag +
+                               ash + water + superplastic + 
+                               coarseagg + fineagg + age,
+                             data = concrete_train, hidden = 5, act.fct = "tanh")
+```
+
+Evaluate the results as we did before. This model performed worse than the previous two models with a correlation of .57.
+```{r}
+model_results2 <- compute(concrete_model2, concrete_test[1:8])
+predicted_strength2 <- model_results2$net.result
+cor(predicted_strength2, concrete_test$strength)
+```
+
+## Question 2: Using ANN on the redwines data.  
+
+## Step 1: Load the data 
+
+```{r}
+redwines <- read.csv("redwines.csv")
+```
+
+## Step 2: Exploring and preparing the data
+
+Examine the structure of the data.
+```{r}
+str(redwines)
+```
+Custom normalization function
+```{r}
+normalize <- function(x) 
+{ 
+  return((x - min(x)) / (max(x) - min(x)))
+}
+```
+
+Apply normalization to entire data frame
+```{r}
+redwines_norm <- as.data.frame(lapply(redwines, normalize))
+```
+
+Create training and test data. Approximately 3/4 of the data is set for training and 1/4 of the data is set for testing.
+```{r}
+redwines_train <- redwines_norm[1:1200, ]
+redwines_test <- redwines_norm[1201:1599, ]
+```
+
+## Step 3: Training a model on the data
+
+# simple ANN with only a single hidden neuron. Using a multilayer feedforward neural network. Quality is the target variable.
+```{r}
+library(neuralnet)
+set.seed(12345)
+redwines_model <- neuralnet(formula = quality ~ fixed.acidity + volatile.acidity + citric.acid + residual.sugar + chlorides + free.sulfur.dioxide + total.sulfur.dioxide + density + pH + sulphates + alcohol, data = redwines_train)
+```
+
+
+visualize the network topology. The nodes labeled as 1 are bias terms. The error is the sum of squares errors. The lower the SSE the better the predictive performance on the training data.
+```{r}
+plot(redwines_model)
+```
+
+Alternative plot
+```{r}
+library(NeuralNetTools)
+par(mar = numeric(4), family = 'serif')
+plotnet(redwines_model, alpha = 0.6)
+```
+
+## Step 4: Evaluating model performance
+
+Obtain model results. Using compute() to generate predictions on the test data set.
+```{r}
+model_results <- compute(redwines_model, redwines_test[1:11])
+```
+
+Obtain predicted strength values
+```{r}
+predicted_quality <- model_results$net.result
+```
+
+Examine the correlation between predicted and actual values. We are using numeric prediction and correlations between our predicted concrete strength and the true values. The r-value is .67 which indicates a good model.
+```{r}
+cor(predicted_quality, redwines_test$quality)   
+```
+
+Produce actual predictions by 
+```{r}
+head(predicted_quality)
+redwines_train_original_quality <- redwines[1:1200,"quality"]
+quality_min <- min(redwines_train_original_quality)
+quality_max <- max(redwines_train_original_quality)
+head(redwines_train_original_quality)
+```
+
+Custom normalization function to unnormalize to convert variables back to the original units of measurement.
+```{r}
+unnormalize <- function(x, min, max) 
+{ 
+  return( (max - min)*x + min )
+}
+```
+
+Unnormalize the data set.
+```{r}
+quality_pred <- unnormalize(predicted_quality,quality_min, quality_max)
+```
+
+## Step 5: Improving model performance 
+
+A more complex neural network topology with 5 hidden nodes in 1 layer. Using a sigmoid activation function.
+```{r}
+set.seed(12345)
+redwines_model2 <- neuralnet(quality ~ fixed.acidity + volatile.acidity + citric.acid + residual.sugar + chlorides + free.sulfur.dioxide + total.sulfur.dioxide + density + pH + sulphates + alcohol,
+                               data = redwines_train, hidden = 5, act.fct = "logistic")
+```
+
+Plot the network. Shows many layers.
+```{r}
+plot(redwines_model2)
+```
+
+Using plotnet
+```{r}
+par(mar = numeric(4), family = 'serif')
+plotnet(redwines_model2, alpha = 0.6)
+```
+
+Evaluate the results as we did before. The correlation stay almost the same at .67 rounded.
+```{r}
+model_results2 <- compute(redwines_model2, redwines_test[1:11])
+predicted_quality2 <- model_results2$net.result
+cor(predicted_quality2, redwines_test$quality)  
+```
+
+Try different activation function with 5 hidden neurons by a hyperbolic tangent activation function.
+```{r}
+set.seed(12345) 
+redwines_model2 <- neuralnet(quality ~ fixed.acidity + volatile.acidity + citric.acid + residual.sugar + chlorides + free.sulfur.dioxide + total.sulfur.dioxide + density + pH + sulphates + alcohol,
+                             data = redwines_train, hidden = 5, act.fct = "tanh")
+```
+
+Evaluate the results as we did before. This model also scored the similarly at r-value of .68.
+```{r}
+model_results2 <- compute(redwines_model2, redwines_test[1:11])
+predicted_quality2 <- model_results2$net.result
+cor(predicted_quality2, redwines_test$quality)
+```
+
+## Question 3: Using ANN on the wines data.  Running the code from "Multilable classification with neuralnet package"
+
+## Step 1: Load the data 
+
+Read in data.
+```{r}
+wines <- read.csv("wines.csv")
+names(wines) <- c("label",
+                  "Alcohol",
+                  "Malic_acid",
+                  "Ash",
+                  "Alcalinity_of_ash",
+                  "Magnesium",
+                  "Total_phenols",
+                  "Flavanoids",
+                  "Nonflavanoid_phenols",
+                  "Proanthocyanins",
+                  "Color_intensity",
+                  "Hue",
+                  "OD280_OD315_of_diluted_wines",
+                  "Proline")
+```
+
+## Step 2: Exploring and preparing the data
+
+```{r}
+str(wines)
+```
+
+```{r}
+library(ggplot2)
+plt1 <- ggplot(wines, aes(x = Alcohol, y = Magnesium, colour = as.factor(label))) +
+    geom_point(size=3) +
+    ggtitle("Wines")
+plt2 <- ggplot(wines, aes(x = Alcohol, y = Proline, colour = as.factor(label))) +
+    geom_point(size=3) +
+    ggtitle("Wines")
+plt1
+plt2
+```
+
+## Step 3: Training a model on the data
+
+Encode as a one hot vector multilabel data. Set labels name.
+```{r}
+require(neuralnet)
+require(nnet)
+require(ggplot2)
+set.seed(10)
+train <- cbind(wines[, 2:14], class.ind(as.factor(wines$label)))
+names(train) <- c(names(wines)[2:14],"l1","l2","l3")
+```
+
+Scale data to have variable values from 0 to 1.
+```{r}
+scl <- function(x){ (x - min(x))/(max(x) - min(x)) }
+train[, 1:13] <- data.frame(lapply(train[, 1:13], scl))
+head(train)
+```
+
+Set up formula, three variables in the response
+```{r}
+n <- names(train)
+f <- as.formula(paste("l1 + l2 + l3 ~", paste(n[!n %in% c("l1","l2","l3")], collapse = " + ")))
+f
+```
+
+Linear.output doing classification not numeric prediction, switch to false. There are 88 steps and an error of .03039.
+```{r}
+nn <- neuralnet(f,
+                data = train,
+                hidden = c(13,10,3),
+                act.fct = "logistic",
+                linear.output = FALSE,
+                lifesign = "minimal")
+```
+
+## Step 4: Evaluating model performance
+
+```{r}
+summary(nn)
+```
+
+Visualize the network topology, 1 hidden layer.
+```{r}
+plot(nn)
+```
+
+Another visualization with plotnet
+```{r}
+par(mar = numeric(4), family = 'serif')
+plotnet(nn, alpha = 0.6)
+```
+
+Compute predictions and extract results
+```{r}
+pr.nn <- compute(nn, train[, 1:13])
+pr.nn_ <- pr.nn$net.result
+head(pr.nn_)
+```
+
+Accuracy (training set), 100% means overfitting.  Accuracy is at 100%.
+```{r}
+original_values <- max.col(train[, 14:16])
+pr.nn_2 <- max.col(pr.nn_)
+mean(pr.nn_2 == original_values)
+```
+
+Crossvalidate with 10-fold
+```{r}
+set.seed(10)
+k <- 10
+outs <- NULL
+proportion <- 0.9
+```
+
+Take sample, calculate predicted values and compare these to the actual output.
+```{r}
+library(plyr) 
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k)
+{
+  index <- sample(1:nrow(train), round(proportion*nrow(train)))
+  train_cv <- train[index, ]
+  test_cv <- train[-index, ]
+  nn_cv <- neuralnet(f,
+                     data = train_cv,
+                     hidden = c(13,10,3),
+                     act.fct = "logistic",
+                     linear.output = FALSE)
+  
+  pr.nn <- compute(nn_cv, test_cv[, 1:13])
+
+  pr.nn_ <- pr.nn$net.result
+  
+  original_values <- max.col(test_cv[, 14:16])
+  pr.nn_2 <- max.col(pr.nn_)
+  outs[i] <- mean(pr.nn_2 == original_values)
+  pbar$step()
+}
+```
+
+Average Accuracy is at 98.33%.
+```{r}
+mean(outs)
+```
+
+## Step 5: Improving model performance 
+
+Improved the model performance by correcting the overfitting by using only 1 hidden layer instead of 2. The model with two layers with 5 nodes in the first layer and 2 nodes in the second layer overfitted the data with an accuracy of 100%.

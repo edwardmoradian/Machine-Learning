@@ -1,0 +1,314 @@
+---
+title: "Decision Trees and Rule Learners"
+author: "Edward Moradian"
+date: "20 April 2018"
+output:
+  word_document: default
+---
+## Question 1: Decision Trees 
+
+## Step 1: Load the data 
+
+```{r}
+credit <- read.csv("credit.csv", stringsAsFactors = TRUE)
+str(credit)
+```
+
+## Step 2: Exploring and preparing the data
+
+```{r}
+str(credit)
+```
+
+Look at two characteristics of the applicant
+
+```{r}
+table(credit$checking_balance)
+table(credit$savings_balance)
+
+```
+
+Look at two characteristics of the loan
+
+```{r}
+summary(credit$months_loan_duration)
+summary(credit$amount)
+```
+
+Look at the class variable.  30% of the loans in this dataset went into default.
+
+```{r}
+table(credit$default)
+```
+
+Create a random sample for training and test data
+Use set.seed to use the same random number sequence as the tutorial. With the same seed everyone will get the same sample.  90% of the data is set for training.
+
+```{r}
+set.seed(123) 
+train_sample <- sample(1000, 900)
+
+str(train_sample)
+```
+
+Split the data frames into a train and test dataset
+
+```{r}
+credit_train <- credit[train_sample, ]
+credit_test  <- credit[-train_sample, ]
+```
+
+
+Check the proportion of class variable. Approximately 1/3 is in yes and 2/3 is in no for defaulted loans for both datasets.
+
+```{r}
+prop.table(table(credit_train$default))
+prop.table(table(credit_test$default))
+```
+
+
+## Step 3: Training a model on the data 
+
+Build the simplest decision tree.  Excluding the 17th column in credit_train dataset becuase it is the default class variable.
+
+```{r}
+library(C50)
+credit_model <- C5.0(credit_train[-17], credit_train$default)
+```
+
+Display simple facts about the tree
+
+```{r}
+credit_model
+```
+
+Display detailed information about the tree. The decision tree is 57 decisions deep. If the checking balance is unknown or greater than 200 DM, then classfiy as not likely to default.  Out of 412 accounts, 50 were incorrectly classified as not likely to default (when they actually did default).  If the checking balance is less than 0 DM or between 1 and 200 DM with the credit history as perfect or very good, then classify as likely to default.
+
+```{r}
+summary(credit_model)
+```
+
+## Step 4: Evaluating model performance 
+
+Create a factor vector of predictions on test data. Showing the prediction of the 100 tests in the test dataset.
+
+```{r}
+credit_pred <- predict(credit_model, credit_test)
+credit_pred
+```
+
+Cross tabulation of predicted versus actual classes. 59 records were predicted not to default when they acutally did not default. 14 records were predicted to default when they actually did default. 8 records were predicted to default when they actually did not default. 19 records were predicted not to default when they actually did default. The model has an accuracy of 73% and an error reate of 27%.
+
+```{r}
+library(gmodels)
+CrossTable(credit_test$default, credit_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+accuracy <- (14+59)/(14+59+8+19)
+accuracy
+```
+
+## Step 5: Improving model performance 
+
+Boosting the accuracy of decision trees
+
+Boosted decision tree with 10 trials.  The error rate has gone from 27% to 18% which is an improvement.
+
+```{r}
+credit_boost10 <- C5.0(credit_train[-17], credit_train$default,
+                       trials = 10)
+credit_boost10
+summary(credit_boost10)
+```
+
+With adaptive boosting, the model improved with an accuracy of 82% from 73%.  5 records were predicted to default when they actually did not default. 13 records were predicted not to default when they actually did default. 
+
+```{r}
+credit_boost_pred10 <- predict(credit_boost10, credit_test)
+CrossTable(credit_test$default, credit_boost_pred10,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+accuracy = (20+62)/(20+62+5+13)
+accuracy
+```
+
+Making some mistakes more costly than others.  Giving a loan out to an applicant who is likely to default can be an expensive mistake.
+
+Create dimensions for a cost matrix
+
+```{r}
+matrix_dimensions <- list(c("no", "yes"), c("no", "yes"))
+names(matrix_dimensions) <- c("predicted", "actual")
+matrix_dimensions
+```
+
+Build the matrix. Assuming that a loan default costs the bank four times as much as a missed opportunity.
+
+```{r}
+error_cost <- matrix(c(0, 1, 4, 0), nrow = 2, dimnames = matrix_dimensions)
+error_cost
+```
+
+Apply the cost matrix to the tree. This shows that costly mistakes have been reduced.  There are only now 7 mistakes in classifying records as not defaulting when they actually did default.
+
+```{r}
+
+credit_cost <- C5.0(credit_train[-17], credit_train$default,
+                    costs = error_cost)
+credit_cost_pred <- predict(credit_cost, credit_test)
+
+CrossTable(credit_test$default, credit_cost_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+
+
+## Question 2: Rule Learners 
+
+Step 1: Load the data 
+
+```{r}
+mushrooms <- read.csv("mushrooms.csv", stringsAsFactors = TRUE)
+```
+
+## Step 2: Exploring and preparing the data 
+
+Examine the structure of the data frame. Every variable is a factor.
+
+```{r}
+str(mushrooms)
+```
+
+
+Drop the veil_type feature because it does not provide any useful information for prediction. Null the variable.
+
+```{r}
+mushrooms$veil_type <- NULL
+```
+
+Examine the class distribution. About 52% of the mushroom samples are edible while 48% are poisonous.
+
+```{r}
+table(mushrooms$type)
+```
+
+Randomize the Train and Test data, 7000 are in the train dataset, the rest of the 8124 are in the test dataset.
+
+```{r}
+set.seed(123)
+train_sample <- sample(8124, 7000)
+
+str(train_sample)
+```
+
+Split the data frames
+
+```{r}
+mushrooms_train <- mushrooms[train_sample, ]
+mushrooms_test  <- mushrooms[-train_sample, ]
+```
+
+## Step 3: Training a model on the data 
+
+```{r}
+library(RWeka)
+```
+
+Train OneR() on the data. The class variable is type. All predictor variables are included in the model.  The model is about the relationship between type and all the other features in the dataset.
+
+```{r}
+mushroom_1R <- OneR(type ~ ., data = mushrooms_train)
+```
+
+## Step 4: Evaluating model performance 
+
+Examine the rules created. The 1 rule is on odor.
+
+```{r}
+mushroom_1R
+summary(mushroom_1R)
+```
+
+Make predictions and show the predictions with mushroom_pred.
+
+```{r}
+mushroom_pred <- predict(mushroom_1R, mushrooms_test)
+```
+
+Cross tabulation of predicted versus actual classes
+The accuracy of the model is at 99% with an error rate of 1%. The model predicted 582 mushrooms as edible when they were actually edible and 527 mushrooms as poisonous when they were actually poisonous. The model incorrectly predicted 15 mushrooms as edible when they were actually poisonous.
+
+
+```{r}
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+Accuracy <- (527+582)/(527+582+0+15)
+Accuracy
+```
+
+
+
+
+## Step 5: Improving model performance by using the RIPPER rule learning algorithm.
+
+Examine the rules
+
+```{r}
+mushroom_JRip <- JRip(type ~ ., data = mushrooms_train)
+mushroom_JRip
+summary(mushroom_JRip)
+```
+
+Make predictions and show the predictions using mushroom_pred.
+
+```{r}
+mushroom_pred <- predict(mushroom_JRip, mushrooms_test)
+```
+
+Cross tabulation of predicted versus actual classes
+Accuracy of the model is 99% with a 1% error rate.  582 mushrooms were correctly identified as labeled and 527 mushrooms were correctly identified as poisonous.  15 mushrooms were identified as edible when they were actually poisonous.
+
+```{r}
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+Accuracy = (527+582)/(527+582+15+0)
+Accuracy
+```
+
+## Rule Learner Using C5.0 Decision Trees (not in text) with Separate and Conquer
+
+```{r}
+library(C50)
+mushroom_c5rules <- C5.0(type ~ odor + gill_size, data = mushrooms_train, rules = TRUE)
+mushroom_c5rules
+summary(mushroom_c5rules)
+```
+
+
+```{r}
+mushroom_pred <- predict(mushroom_c5rules, mushrooms_test)
+```
+
+Cross tabulation of predicted versus actual classes
+The model's accuracy rate is 99% with an error rate of 1%. The model correctly identified 582 mushrooms as edible and 527 mushrooms as poisonous. The model incorrectly identified 15 mushrooms as edible when they were actually poisonous.
+
+```{r}
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+Accuracy = (582+527)/(582+527+0+15)
+Accuracy
+```
+
+
+
+
+
+
+
+
