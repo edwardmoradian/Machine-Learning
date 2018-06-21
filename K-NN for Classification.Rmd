@@ -1,0 +1,238 @@
+---
+title: "K-NN for Classification"
+author: "Edward Moradian"
+date: "04 April 2018"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+Question 1)
+
+1) Step One: Collecting the Data
+Data has already been collected.  569 observations of 32 variables.
+
+```{r}
+wbcd <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
+str(wbcd)
+
+```
+
+2) Step Two: Exploring and Preparing the Data
+Removed the ID variable and made diagnosis into a factor with two levels - B and M.
+
+```{r}
+wbcd <- wbcd[-1]
+wbcd$diagnosis <- factor(wbcd$diagnosis, levels = c("B", "M"),
+                         labels = c("Benign", "Malignant"))
+```
+
+2a) Transformation - Normalizing Numeric Data
+Normalizing the data using min-max normalization.  Checking to see if the normalization was applied correctly.
+
+```{r}
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+wbcd_n <- as.data.frame(lapply(wbcd[2:31], normalize))
+summary(wbcd_n$area_mean)
+```
+
+2b) Data Preparation - Creating Training and Test Datasets
+
+```{r}
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+wbcd_train_labels <- wbcd[1:469, 1]
+wbcd_test_labels <- wbcd[470:569, 1]
+```
+
+3) Step Three: Training a Model on the Data
+
+```{r}
+library(class)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test,
+                      cl = wbcd_train_labels, k = 21)
+
+head(wbcd_test)
+head(wbcd_test_pred)
+```
+
+4) Step Four: Evaluating Model Performance
+According to the confusion matrix, there two observations out of 100 that were false negative.  Accuracy formula returns .98 and therefore the algorithm gives highly accurate predictions.  The error rate is .02.  61 out of the 100 observations where true negatives results where the mass was benign and the algorithm identified it as benign.  37 out of 100 observations were true positives where the mass was malignant and the algorithm identified it as malignant.
+
+```{r}
+library(gmodels)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred,
+           prop.chisq = FALSE)
+Accuracy = (37+61)/(37+61+0+2)
+Accuracy
+```
+
+5) Step Five: Improving Model Performance
+
+5a) Transformation - Z-Score Standardization
+Z-Score transformation of the data and checking that it was correctly applied.
+
+```{r}
+wbcd_z <- as.data.frame(scale(wbcd[-1]))
+summary(wbcd_z$area_mean)
+```
+
+5b) Testing Alternative Values of K
+
+```{r}
+wbcd_train <- wbcd_z[1:469, ]
+wbcd_test <- wbcd_z[470:569, ]
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test,
+                      cl = wbcd_train_labels, k = 21)
+
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred,
+           prop.chisq = FALSE)
+
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+
+
+strt<-Sys.time()
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=1)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=5)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=11)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=15)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=21)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=27)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq=FALSE)
+
+print(Sys.time()-strt)
+```
+
+Question 2)
+
+1) Step One: Collecting the Data
+Data has already been collected.  The dataset contains data about a study about survival patients who had undergone surgery for breast cancer.  306 observations of 4 variables.
+
+```{r}
+cancer <- read.csv("haberman.data", stringsAsFactors = FALSE)
+str(cancer)
+```
+
+2) Step Two: Exploring and Preparing the Data
+No ID variable and made survival into a factor with two levels - Survived and DidNotSurvive.
+
+```{r}
+cancer$Survival <- factor(cancer$Survival, levels = c("1","2"),
+                         labels = c("Survived","DidNotSurvive"))
+```
+
+2a) Transformation - Normalizing Numeric Data
+Normalizing the data using min-max normalization.  Checking to see if the normalization was applied correctly.
+
+```{r}
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+cancer_n <- as.data.frame(lapply(cancer[1:3], normalize))
+summary(cancer_n$NumPositiveNodes)
+```
+
+2b) Data Preparation - Creating Training and Test Datasets
+
+```{r}
+cancer_train <- cancer_n[1:250, ]
+cancer_test <- cancer_n[251:306, ]
+cancer_train_labels <- cancer[1:250, 4]
+cancer_test_labels <- cancer[251:306, 4]
+```
+
+3) Step Three: Training a Model on the Data
+
+```{r}
+library(class)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test,
+                      cl = cancer_train_labels, k = 1)
+
+head(cancer_test)
+head(cancer_test_pred)
+```
+
+4) Step Four: Evaluating Model Performance
+According to the confusion matrix, there 13 observations out of 100 that were false negative and 9 observations that were false positive.  Accuracy formula returns .61 and therefore the algorithm does not give accurate predictions.  The error rate is .39.  32 out of the 100 observations where true negatives results where the patient survived and the algorithm identified the patient as a survival.  4 out of 100 observations were true positives where the patient did not survive and the algorithm identified the patient as one that did not survive.
+
+```{r}
+library(gmodels)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred,
+           prop.chisq = FALSE)
+Accuracy = (2+32)/(2+32+9+13)
+Accuracy
+```
+
+5) Step Five: Improving Model Performance
+
+5a) Transformation - Z-Score Standardization
+Z-Score transformation of the data and checking that it was correctly applied.
+
+```{r}
+cancer_z <- as.data.frame(scale(cancer[1:3]))
+summary(cancer_z$NumPositiveNodes)
+```
+
+5b) Testing Alternative Values of K
+
+```{r}
+cancer_train <- cancer_z[1:250, ]
+cancer_test <- cancer_z[251:306, ]
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test,
+                      cl = cancer_train_labels, k = 1)
+
+CrossTable(x = cancer_test_labels, y = cancer_test_pred,
+           prop.chisq = FALSE)
+
+cancer_train <- cancer_n[1:250, ]
+cancer_test <- cancer_n[251:306, ]
+
+
+strt<-Sys.time()
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=1)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=5)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=11)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=15)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=21)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+cancer_test_pred <- knn(train = cancer_train, test = cancer_test, cl = cancer_train_labels, k=27)
+CrossTable(x = cancer_test_labels, y = cancer_test_pred, prop.chisq=FALSE)
+
+print(Sys.time()-strt)
+```
+
+
+
+
+
